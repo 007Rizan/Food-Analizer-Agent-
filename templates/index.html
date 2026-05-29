@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PaketLens — İçerik Analizi</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0d0d0f;
+      --surface: #16161a;
+      --border: #2a2a32;
+      --accent: #c8f135;
+      --accent-dim: rgba(200,241,53,0.12);
+      --red: #ff5c5c;
+      --red-dim: rgba(255,92,92,0.12);
+      --yellow: #ffc84a;
+      --yellow-dim: rgba(255,200,74,0.12);
+      --text: #e8e8ec;
+      --muted: #6b6b7a;
+      --radius: 16px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Noise overlay */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .container {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 60px 24px 100px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Header */
+    header {
+      text-align: center;
+      margin-bottom: 56px;
+    }
+
+    .logo {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .logo-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 16px var(--accent);
+    }
+
+    h1 {
+      font-family: 'Syne', sans-serif;
+      font-size: clamp(2rem, 5vw, 3.2rem);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      line-height: 1.1;
+    }
+
+    h1 span { color: var(--accent); }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: 1rem;
+      margin-top: 12px;
+      font-weight: 300;
+    }
+
+    /* Upload zone */
+    .upload-zone {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 56px 32px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.25s, background 0.25s;
+      background: var(--surface);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .upload-zone:hover, .upload-zone.drag-over {
+      border-color: var(--accent);
+      background: var(--accent-dim);
+    }
+
+    .upload-zone input {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      width: 100%;
+      height: 100%;
+    }
+
+    .upload-icon {
+      font-size: 3rem;
+      margin-bottom: 16px;
+      display: block;
+    }
+
+    .upload-label {
+      font-family: 'Syne', sans-serif;
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .upload-sub {
+      color: var(--muted);
+      font-size: 0.85rem;
+      margin-top: 6px;
+    }
+
+    /* Preview */
+    .preview-wrap {
+      margin-top: 24px;
+      display: none;
+      position: relative;
+    }
+
+    .preview-wrap.visible { display: block; }
+
+    .preview-wrap img {
+      width: 100%;
+      border-radius: var(--radius);
+      max-height: 320px;
+      object-fit: contain;
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
+
+    .preview-remove {
+      position: absolute;
+      top: 12px; right: 12px;
+      background: rgba(0,0,0,0.7);
+      border: none;
+      color: var(--text);
+      border-radius: 50%;
+      width: 32px; height: 32px;
+      cursor: pointer;
+      font-size: 1rem;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.2s;
+    }
+    .preview-remove:hover { background: var(--red); }
+
+    /* Button */
+    .btn-analyze {
+      display: block;
+      width: 100%;
+      margin-top: 20px;
+      padding: 18px;
+      background: var(--accent);
+      color: #0d0d0f;
+      border: none;
+      border-radius: var(--radius);
+      font-family: 'Syne', sans-serif;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      letter-spacing: 0.02em;
+      transition: opacity 0.2s, transform 0.15s;
+    }
+
+    .btn-analyze:hover { opacity: 0.88; transform: translateY(-1px); }
+    .btn-analyze:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+    /* Loading */
+    .loading {
+      display: none;
+      text-align: center;
+      padding: 48px;
+      margin-top: 32px;
+    }
+    .loading.visible { display: block; }
+
+    .spinner {
+      width: 48px; height: 48px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 20px;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .loading p {
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    /* Results */
+    .results {
+      display: none;
+      margin-top: 40px;
+      animation: fadeUp 0.4s ease;
+    }
+    .results.visible { display: block; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Verdict banner */
+    .verdict {
+      border-radius: var(--radius);
+      padding: 28px 32px;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .verdict.yararli { background: var(--accent-dim); border: 1px solid var(--accent); }
+    .verdict.zararli { background: var(--red-dim); border: 1px solid var(--red); }
+    .verdict.dikkatli { background: var(--yellow-dim); border: 1px solid var(--yellow); }
+
+    .verdict-icon { font-size: 2.5rem; flex-shrink: 0; }
+
+    .verdict-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 1.4rem;
+      font-weight: 800;
+    }
+    .verdict.yararli .verdict-title { color: var(--accent); }
+    .verdict.zararli .verdict-title { color: var(--red); }
+    .verdict.dikkatli .verdict-title { color: var(--yellow); }
+
+    .verdict-text {
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin-top: 4px;
+    }
+
+    /* Score */
+    .score-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 24px;
+      margin-bottom: 24px;
+    }
+
+    .score-label {
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 0.85rem;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .score-bar-wrap {
+      flex: 1;
+      height: 8px;
+      background: var(--border);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+
+    .score-bar {
+      height: 100%;
+      border-radius: 99px;
+      transition: width 1s cubic-bezier(0.34,1.56,0.64,1);
+      width: 0%;
+    }
+
+    .score-num {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: 1.2rem;
+      white-space: nowrap;
+    }
+
+    /* Cards */
+    .cards-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    @media (max-width: 560px) { .cards-grid { grid-template-columns: 1fr; } }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+    }
+
+    .card-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 14px;
+    }
+
+    .card.harmful .card-title { color: var(--red); }
+    .card.helpful .card-title { color: var(--accent); }
+
+    .tag-list { display: flex; flex-wrap: wrap; gap: 8px; }
+
+    .tag {
+      font-size: 0.8rem;
+      padding: 4px 12px;
+      border-radius: 99px;
+      font-weight: 500;
+    }
+
+    .tag.bad { background: var(--red-dim); color: var(--red); border: 1px solid rgba(255,92,92,0.3); }
+    .tag.good { background: var(--accent-dim); color: var(--accent); border: 1px solid rgba(200,241,53,0.3); }
+    .tag.neutral { background: rgba(255,255,255,0.05); color: var(--muted); border: 1px solid var(--border); }
+
+    .item-row {
+      margin-bottom: 10px;
+    }
+    .item-name { font-size: 0.9rem; font-weight: 500; }
+    .item-desc { font-size: 0.8rem; color: var(--muted); margin-top: 2px; }
+
+    /* Tavsiye */
+    .advice-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+
+    .advice-card h3 {
+      font-family: 'Syne', sans-serif;
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+
+    .advice-card p {
+      font-size: 0.95rem;
+      line-height: 1.6;
+      color: var(--text);
+    }
+
+    /* Retry */
+    .btn-retry {
+      display: block;
+      width: 100%;
+      padding: 14px;
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-family: 'Syne', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s;
+    }
+    .btn-retry:hover { border-color: var(--text); color: var(--text); }
+
+    /* Error */
+    .error-box {
+      display: none;
+      background: var(--red-dim);
+      border: 1px solid var(--red);
+      border-radius: var(--radius);
+      padding: 20px 24px;
+      color: var(--red);
+      margin-top: 24px;
+      font-size: 0.9rem;
+    }
+    .error-box.visible { display: block; }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <div class="logo">
+      <div class="logo-dot"></div>
+      <span style="font-family:'Syne',sans-serif;font-weight:800;font-size:1rem;letter-spacing:.05em">PAKETLENS</span>
+    </div>
+    <h1>Paketteki her şey<br><span>gün yüzüne çıkıyor.</span></h1>
+    <p class="subtitle">Ürün fotoğrafını yükle, yapay zeka içindeki bileşenleri analiz etsin.</p>
+  </header>
+
+  <!-- Upload -->
+  <div class="upload-zone" id="dropzone">
+    <input type="file" id="fileInput" accept="image/*" />
+    <span class="upload-icon">📦</span>
+    <div class="upload-label">Fotoğrafı buraya sürükle veya tıkla</div>
+    <div class="upload-sub">PNG, JPG, WEBP · Maks. 10 MB</div>
+  </div>
+
+  <div class="preview-wrap" id="previewWrap">
+    <img id="previewImg" src="" alt="Önizleme" />
+    <button class="preview-remove" id="removeBtn">✕</button>
+  </div>
+
+  <button class="btn-analyze" id="analyzeBtn" disabled>Analiz Et →</button>
+
+  <!-- Loading -->
+  <div class="loading" id="loadingDiv">
+    <div class="spinner"></div>
+    <p>Bileşenler okunuyor ve değerlendiriliyor…</p>
+  </div>
+
+  <!-- Error -->
+  <div class="error-box" id="errorBox"></div>
+
+  <!-- Results -->
+  <div class="results" id="resultsDiv">
+
+    <div class="verdict" id="verdictBanner">
+      <div class="verdict-icon" id="verdictIcon"></div>
+      <div>
+        <div class="verdict-title" id="verdictTitle"></div>
+        <div class="verdict-text" id="verdictText"></div>
+      </div>
+    </div>
+
+    <div class="score-row">
+      <div class="score-label">Sağlık Skoru</div>
+      <div class="score-bar-wrap">
+        <div class="score-bar" id="scoreBar"></div>
+      </div>
+      <div class="score-num" id="scoreNum"></div>
+    </div>
+
+    <div class="cards-grid">
+      <div class="card harmful">
+        <div class="card-title">⚠ Zararlı Maddeler</div>
+        <div id="harmfulList"></div>
+      </div>
+      <div class="card helpful">
+        <div class="card-title">✓ Yararlı Maddeler</div>
+        <div id="helpfulList"></div>
+      </div>
+    </div>
+
+    <div class="advice-card">
+      <h3>Genel Değerlendirme</h3>
+      <p id="generalText"></p>
+    </div>
+
+    <div class="advice-card">
+      <h3>Tavsiye</h3>
+      <p id="adviceText"></p>
+    </div>
+
+    <div class="advice-card">
+      <h3>Tespit Edilen İçerik</h3>
+      <div class="tag-list" id="ingredientTags"></div>
+    </div>
+
+    <button class="btn-retry" id="retryBtn">← Yeni Fotoğraf Yükle</button>
+  </div>
+
+</div>
+
+<script>
+  const fileInput = document.getElementById('fileInput');
+  const dropzone = document.getElementById('dropzone');
+  const previewWrap = document.getElementById('previewWrap');
+  const previewImg = document.getElementById('previewImg');
+  const removeBtn = document.getElementById('removeBtn');
+  const analyzeBtn = document.getElementById('analyzeBtn');
+  const loadingDiv = document.getElementById('loadingDiv');
+  const resultsDiv = document.getElementById('resultsDiv');
+  const errorBox = document.getElementById('errorBox');
+
+  let selectedFile = null;
+
+  // Drag & drop
+  dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag-over'); });
+  dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag-over'));
+  dropzone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropzone.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) setFile(file);
+  });
+
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files[0]) setFile(fileInput.files[0]);
+  });
+
+  function setFile(file) {
+    selectedFile = file;
+    const url = URL.createObjectURL(file);
+    previewImg.src = url;
+    previewWrap.classList.add('visible');
+    analyzeBtn.disabled = false;
+    resultsDiv.classList.remove('visible');
+    errorBox.classList.remove('visible');
+  }
+
+  removeBtn.addEventListener('click', () => {
+    selectedFile = null;
+    fileInput.value = '';
+    previewImg.src = '';
+    previewWrap.classList.remove('visible');
+    analyzeBtn.disabled = true;
+  });
+
+  document.getElementById('retryBtn').addEventListener('click', () => {
+    resultsDiv.classList.remove('visible');
+    removeBtn.click();
+  });
+
+  analyzeBtn.addEventListener('click', async () => {
+    if (!selectedFile) return;
+
+    analyzeBtn.disabled = true;
+    loadingDiv.classList.add('visible');
+    resultsDiv.classList.remove('visible');
+    errorBox.classList.remove('visible');
+
+    const formData = new FormData();
+    formData.append('image', selectedFile);
+
+    try {
+      const res = await fetch('/analyze', { method: 'POST', body: formData });
+      const json = await res.json();
+
+      if (!json.success) throw new Error(json.error || 'Bilinmeyen hata');
+
+      renderResults(json.data);
+    } catch (err) {
+      errorBox.textContent = '⚠ ' + err.message;
+      errorBox.classList.add('visible');
+    } finally {
+      loadingDiv.classList.remove('visible');
+      analyzeBtn.disabled = false;
+    }
+  });
+
+  function renderResults(d) {
+    // Verdict
+    const banner = document.getElementById('verdictBanner');
+    const icons = { yararli: '✅', zararli: '❌', dikkatli: '⚠️' };
+    const titles = { yararli: 'Yararlı Ürün', zararli: 'Zararlı Ürün', dikkatli: 'Dikkatli Tüket' };
+    const sonuc = d.sonuc || 'dikkatli';
+    banner.className = 'verdict ' + sonuc;
+    document.getElementById('verdictIcon').textContent = icons[sonuc] || '🔍';
+    document.getElementById('verdictTitle').textContent = (d.urun_adi ? d.urun_adi + ' — ' : '') + titles[sonuc];
+    document.getElementById('verdictText').textContent = d.genel_degerlendirme || '';
+
+    // Score
+    const score = Math.min(100, Math.max(0, d.saglik_skoru || 50));
+    const bar = document.getElementById('scoreBar');
+    const scoreColors = { yararli: '#c8f135', zararli: '#ff5c5c', dikkatli: '#ffc84a' };
+    bar.style.background = scoreColors[sonuc] || '#c8f135';
+    document.getElementById('scoreNum').textContent = score + ' / 100';
+    setTimeout(() => { bar.style.width = score + '%'; }, 100);
+
+    // Harmful
+    const harmfulList = document.getElementById('harmfulList');
+    harmfulList.innerHTML = '';
+    if (d.zararli_maddeler && d.zararli_maddeler.length) {
+      d.zararli_maddeler.forEach(m => {
+        harmfulList.innerHTML += `<div class="item-row"><div class="item-name" style="color:#ff5c5c">${m.ad}</div><div class="item-desc">${m.aciklama}</div></div>`;
+      });
+    } else {
+      harmfulList.innerHTML = '<div style="color:#6b6b7a;font-size:.85rem">Zararlı madde tespit edilmedi</div>';
+    }
+
+    // Helpful
+    const helpfulList = document.getElementById('helpfulList');
+    helpfulList.innerHTML = '';
+    if (d.yararli_maddeler && d.yararli_maddeler.length) {
+      d.yararli_maddeler.forEach(m => {
+        helpfulList.innerHTML += `<div class="item-row"><div class="item-name" style="color:#c8f135">${m.ad}</div><div class="item-desc">${m.aciklama}</div></div>`;
+      });
+    } else {
+      helpfulList.innerHTML = '<div style="color:#6b6b7a;font-size:.85rem">Yararlı madde tespit edilmedi</div>';
+    }
+
+    // General & advice
+    document.getElementById('generalText').textContent = d.genel_degerlendirme || '—';
+    document.getElementById('adviceText').textContent = d.tavsiye || '—';
+
+    // Ingredients
+    const tagContainer = document.getElementById('ingredientTags');
+    tagContainer.innerHTML = '';
+    const icerik = d.tespit_edilen_icerik || [];
+    const zararliNames = (d.zararli_maddeler || []).map(x => x.ad.toLowerCase());
+    const yararliNames = (d.yararli_maddeler || []).map(x => x.ad.toLowerCase());
+    icerik.forEach(item => {
+      let cls = 'neutral';
+      if (zararliNames.some(z => item.toLowerCase().includes(z))) cls = 'bad';
+      else if (yararliNames.some(y => item.toLowerCase().includes(y))) cls = 'good';
+      tagContainer.innerHTML += `<span class="tag ${cls}">${item}</span>`;
+    });
+
+    resultsDiv.classList.add('visible');
+    resultsDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+</script>
+</body>
+</html>
