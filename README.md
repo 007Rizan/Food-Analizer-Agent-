@@ -38,5 +38,4 @@ paket-analiz/
 │   └── index.html      # Arayüz
 └── README.md
 ```
-# Food-Analizer-Agent-
-# Food-Analizer-Agent-
+
