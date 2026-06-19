@@ -4,22 +4,9 @@
 
 ## Kurulum
 
-```bash
-# 1. Sanal ortam oluştur
-python -m venv venv
-source venv/bin/activate        # Windows: venv\Scripts\activate
 
-# 2. Bağımlılıkları yükle
-pip install -r requirements.txt
 
-# 3. Anthropic API anahtarını ayarla
-export ANTHROPIC_API_KEY="sk-ant-..."   # Windows: set ANTHROPIC_API_KEY=sk-ant-...
-
-# 4. Uygulamayı başlat
-python app.py
-```
-
-Tarayıcıda `http://localhost:5000` adresine git.
+Tarayıcıda `(https://food-analizer-agent.onrender.com/)` adresine git.
 
 ## Nasıl Çalışır?
 
